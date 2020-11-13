@@ -1,4 +1,4 @@
-package com.ziguhonglan.testapp.ui.giftool;
+package com.ziguhonglan.testapp.giftool;
 
 import android.graphics.Bitmap;
 import android.os.AsyncTask;

@@ -1,4 +1,4 @@
-package com.ziguhonglan.testapp.ui.giftool;
+package com.ziguhonglan.testapp.giftool;
 
 /**
  * Created by jianglixuan on 2020/5/7.

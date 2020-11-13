@@ -1,41 +1,42 @@
-package com.ziguhonglan.testapp.ui.giftool;
+package com.ziguhonglan.testapp.giftool;
 
 import android.graphics.Bitmap;
 import android.graphics.Bitmap.Config;
+import android.graphics.BitmapFactory;
 import android.graphics.Canvas;
 import android.graphics.Paint;
 
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
 
 /**
  * Gif编码压缩
  */
-public class SimpleAnimatedGifEncoder {
+public class AnimatedGifEncoder {
 
-    private int width; // 图片帧的宽度
-    private int height; // 图片帧的高度
-    private int x = 0;
-    private int y = 0;
-    private int transparent = -1; // transparent color if given
-    private int transIndex; // transparent index in color table
-    private int repeat = -1; // 重复设置，0表示无限重复
-    private int delay = 0; // frame delay (hundredths)
-    private boolean started = false; // ready to output frames
-    private OutputStream out;
-    private Bitmap image; // 当前帧
-    private byte[] pixels; // BGR byte array from frame
-    private byte[] indexedPixels; // converted frame indexed to palette
-    private int colorDepth; // number of bit planes
-    private byte[] colorTab; // RGB palette
-    private boolean[] usedEntry = new boolean[256]; // active palette entries
-    private int palSize = 7; // color table size (bits-1)
-    private int dispose = -1; // disposal code (-1 = use default)
-    private boolean closeStream = true; // close stream when finished
-    private boolean firstFrame = true;
-    private boolean sizeSet = false; // if false, get size from first frame
-    private int sample = 10; // default sample interval for quantizer
-    private Paint paint = new Paint();
+    protected int width; // 图片帧的宽度
+    protected int height; // 图片帧的高度
+    protected int x = 0;
+    protected int y = 0;
+    protected int transparent = -1; // transparent color if given
+    protected int transIndex; // transparent index in color table
+    protected int repeat = -1; // 重复设置，0表示无限重复
+    protected int delay = 0; // frame delay (hundredths)
+    protected boolean started = false; // ready to output frames
+    protected OutputStream out;
+    protected Bitmap image; // 当前帧
+    protected byte[] pixels; // BGR byte array from frame
+    protected byte[] indexedPixels; // converted frame indexed to palette
+    protected int colorDepth; // number of bit planes
+    protected byte[] colorTab; // RGB palette
+    protected boolean[] usedEntry = new boolean[256]; // active palette entries
+    protected int palSize = 7; // color table size (bits-1)
+    protected int dispose = -1; // disposal code (-1 = use default)
+    protected boolean closeStream = true; // close stream when finished
+    protected boolean firstFrame = true;
+    protected boolean sizeSet = false; // if false, get size from first frame
+    protected int sample = 10; // default sample interval for quantizer
 
     /**
      * Sets the delay time between each frame, or changes it for subsequent frames
@@ -48,7 +49,7 @@ public class SimpleAnimatedGifEncoder {
     }
 
     public void setDelayNotDivide(int ms) {
-        delay = ms;
+        delay = ms ;
     }
 
     /**
@@ -69,11 +70,12 @@ public class SimpleAnimatedGifEncoder {
      * 1; 0 means play indefinitely. Must be invoked before the first image is
      * added.
      *
-     * @param repeat int number of iterations.
+     * @param iter int number of iterations.
+     * @return
      */
-    public void setRepeat(int repeat) {
-        if (repeat >= 0) {
-            this.repeat = repeat;
+    public void setRepeat(int iter) {
+        if (iter >= 0) {
+            repeat = iter;
         }
     }
 
@@ -87,24 +89,8 @@ public class SimpleAnimatedGifEncoder {
      * @param c Color to be treated as transparent on display.
      */
     public void setTransparent(int c) {
+        //MyLog.w("GifTest  setTransparent = " + c);
         transparent = c;
-    }
-
-    private void writeHeader() {
-        try {
-            writeString("GIF89a");
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-    }
-
-    private void writeTrailer() {
-        try {
-            out.write(0x3b); // gif trailer
-            out.flush();
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
     }
 
     /**
@@ -115,17 +101,39 @@ public class SimpleAnimatedGifEncoder {
      * for all subsequent frames.
      *
      * @param im BufferedImage containing frame to write.
+     * @return true if successful.
      */
-    public void writeFrameData(Bitmap im) {
+    public boolean addFrame(Bitmap im,boolean compressBitmap) {
         if ((im == null) || !started) {
-            return;
+            return false;
         }
+        boolean ok = true;
         try {
+            if (compressBitmap){
+//                MyLog.i("---压缩帧前:w="+im.getWidth()+",h="+im.getHeight()+",size="+im.getByteCount());
+                try{
+//                   Bitmap temp = Bitmap.createScaledBitmap(im, (int) (im.getWidth()*0.6f), (int) (im.getHeight()*0.6f), true);
+
+                    byte[] bytes = byteArrayFromBitmap(im,100);
+                    BitmapFactory.Options options = new BitmapFactory.Options();
+                    options.inPreferredConfig = Config.RGB_565;
+                    options.inSampleSize = 1;
+                    Bitmap temp = BitmapFactory.decodeByteArray(bytes,0,bytes.length,options);
+                   if (temp != null){
+                       im.recycle();
+                       im = temp;
+//                       MyLog.i("---压缩帧后:w="+im.getWidth()+",h="+im.getHeight()+",size="+im.getByteCount());
+                   }
+                }catch (OutOfMemoryError e){
+                    e.printStackTrace();
+                }
+            }
             image = im;
             if (!sizeSet) {
                 // use first frame's size
                 setSize(im.getWidth(), im.getHeight());
             }
+
             getImagePixels(); // convert to correct format if necessary
             analyzePixels(); // build color table & map pixels
             if (firstFrame) {
@@ -145,28 +153,130 @@ public class SimpleAnimatedGifEncoder {
             firstFrame = false;
         } catch (IOException e) {
             e.printStackTrace();
-        } catch (OutOfMemoryError e) {
+            ok = false;
+        } catch (OutOfMemoryError e){
             e.printStackTrace();
         }
+
+        return ok;
+    }
+
+
+    public boolean addFrame(Bitmap im, boolean compressBitmap, int maxWidth) {
+        if ((im == null) || !started) {
+            return false;
+        }
+        boolean ok = true;
+        try {
+
+            if(compressBitmap){
+
+    //                MyLog.i("---压缩帧前:w="+im.getWidth()+",h="+im.getHeight()+",size="+im.getByteCount());
+                try{
+    //                   Bitmap temp = Bitmap.createScaledBitmap(im, (int) (im.getWidth()*0.6f), (int) (im.getHeight()*0.6f), true);
+                    byte[] bytes = byteArrayFromBitmap(im,100);
+                    BitmapFactory.Options options = new BitmapFactory.Options();
+                    options.inJustDecodeBounds = true;
+                    BitmapFactory.decodeByteArray(bytes,0,bytes.length,options);
+                    int sampleSize = 1;
+                    if (options.outWidth > options.outHeight && options.outWidth > maxWidth) {
+                        sampleSize = Math.round(options.outWidth * 1.0f / maxWidth);
+                    } else if (options.outHeight >= options.outWidth && options.outHeight > maxWidth) {
+                        sampleSize = Math.round(options.outHeight * 1.0f / maxWidth);
+                    }
+                    if(sampleSize < 1){
+                        sampleSize = 1;
+                    }
+                    options.inJustDecodeBounds = false;
+                    options.inPreferredConfig = Config.RGB_565;
+                    options.inSampleSize = sampleSize;
+                    Bitmap temp = BitmapFactory.decodeByteArray(bytes,0,bytes.length,options);
+                    if (temp != null){
+                        im.recycle();
+                        im = temp;
+    //                       MyLog.i("---压缩帧后:w="+im.getWidth()+",h="+im.getHeight()+",size="+im.getByteCount());
+                    }
+                }catch (OutOfMemoryError e){
+                    e.printStackTrace();
+                }
+            }
+
+            image = im;
+
+            if (!sizeSet) {
+                // use first frame's size
+                setSize(im.getWidth(), im.getHeight());
+            }
+
+            getImagePixels(); // convert to correct format if necessary
+            analyzePixels(); // build color table & map pixels
+            if (firstFrame) {
+                writeLSD(); // logical screen descriptior
+                writePalette(); // global color table
+                if (repeat >= 0) {
+                    // use NS app extension to indicate reps
+                    writeNetscapeExt();
+                }
+            }
+            writeGraphicCtrlExt(); // write graphic control extension
+            writeImageDesc(); // image descriptor
+            if (!firstFrame) {
+                writePalette(); // local color table
+            }
+
+            writePixels(); // encode and write pixel data
+            firstFrame = false;
+        } catch (IOException e) {
+            e.printStackTrace();
+            ok = false;
+        } catch (OutOfMemoryError e){
+            e.printStackTrace();
+        }
+
+        return ok;
+    }
+
+
+    public byte[] byteArrayFromBitmap(Bitmap bitmap, int percent){
+        byte[] data = null;
+        ByteArrayOutputStream baos = null;
+        try {
+            baos = new ByteArrayOutputStream();
+            bitmap.compress(Bitmap.CompressFormat.PNG, percent, baos);
+            data = baos.toByteArray();
+        } catch (Exception e) {
+            e.printStackTrace();
+        } finally {
+            try {
+                if(baos != null) {
+                    baos.close();
+                }
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+        }
+        return data;
     }
 
     /**
      * Flushes any pending data and closes output file. If writing to an
      * OutputStream, the stream is not closed.
      */
-    public void finish() {
-        if (!started) return;
+    public boolean finish() {
+        if (!started)
+            return false;
+        boolean ok = true;
         started = false;
         try {
+            out.write(0x3b); // gif trailer
+            out.flush();
             if (closeStream) {
                 out.close();
             }
         } catch (IOException e) {
-            e.printStackTrace();
+            ok = false;
         }
-        if (image != null && !image.isRecycled()) {
-            image.recycle();
-        }
+
         // reset for subsequent use
         transIndex = 0;
         out = null;
@@ -176,6 +286,8 @@ public class SimpleAnimatedGifEncoder {
         colorTab = null;
         closeStream = false;
         firstFrame = true;
+
+        return ok;
     }
 
     /**
@@ -200,6 +312,7 @@ public class SimpleAnimatedGifEncoder {
      * @param quality int greater than 0.
      *                经测试，数值越小，压缩时间越久,颜色越清晰
      *                数值越大，压缩时间越快(40M的图片压缩2分钟)
+     * @return
      */
     public void setQuality(int quality) {
         if (quality < 1)
@@ -224,11 +337,11 @@ public class SimpleAnimatedGifEncoder {
         sizeSet = true;
     }
 
-    public int getWidth() {
+    public int getWidth(){
         return width;
     }
 
-    public int getHeight() {
+    public int getHeight(){
         return height;
     }
 
@@ -249,22 +362,27 @@ public class SimpleAnimatedGifEncoder {
      * automatically.
      *
      * @param os OutputStream on which GIF images are written.
+     * @return false if initial write failed.
      */
-    public void start(OutputStream os, boolean isFirstFrame) {
-        if (os == null) return;
+    public boolean start(OutputStream os) {
+        if (os == null)
+            return false;
+        boolean ok = true;
         closeStream = false;
         out = os;
-        if (isFirstFrame) {
-            writeHeader();
+        try {
+            writeString("GIF89a"); // header
+        } catch (IOException e) {
+            e.printStackTrace();
+            ok = false;
         }
-        firstFrame = isFirstFrame;
-        started = true;
+        return started = ok;
     }
 
     /**
      * Analyzes image colors and creates color map.
      */
-    private void analyzePixels() {
+    protected void analyzePixels() {
         int len = pixels.length;
         int nPix = len / 3;
         indexedPixels = new byte[nPix];
@@ -278,16 +396,19 @@ public class SimpleAnimatedGifEncoder {
             colorTab[i + 2] = temp;
             usedEntry[i / 3] = false;
         }
+
         // map image pixels to new palette
         int k = 0;
         for (int i = 0; i < nPix; i++) {
-            int index = nq.map(pixels[k++] & 0xff, pixels[k++] & 0xff, pixels[k++] & 0xff, transparent != -1);
+            int index = nq.map(pixels[k++] & 0xff, pixels[k++] & 0xff, pixels[k++] & 0xff , transparent != -1);
             usedEntry[index] = true;
             indexedPixels[i] = (byte) index;
         }
+
         pixels = null;
         colorDepth = 8;
         palSize = 7;
+
         // get closest match to transparent color if specified
         if (transparent != -1) {
             transIndex = findClosest(transparent);
@@ -297,12 +418,12 @@ public class SimpleAnimatedGifEncoder {
     /**
      * Returns index of palette color closest to c
      */
-    private int findClosest(int c) {
+    protected int findClosest(int c) {
         if (colorTab == null)
             return -1;
         int r = (c >> 16) & 0xff;
         int g = (c >> 8) & 0xff;
-        int b = (c) & 0xff;
+        int b = (c >> 0) & 0xff;
         int minpos = 0;
         int len = colorTab.length;
 
@@ -313,8 +434,8 @@ public class SimpleAnimatedGifEncoder {
             int db = b - (colorTab[i] & 0xff);
             int d = dr * dr + dg * dg + db * db;
             int index = i / 3;
-            if (usedEntry[index]
-                    && d == 0) {
+            if(usedEntry[index]
+                    && d == 0){
                 minpos = index;
             }
             i++;
@@ -325,17 +446,14 @@ public class SimpleAnimatedGifEncoder {
     /**
      * Extracts image pixels into byte array "pixels"
      */
-    private void getImagePixels() {
+    protected void getImagePixels() {
         int w = image.getWidth();
         int h = image.getHeight();
         if ((w != width) || (h != height)) {
             // create new image with right size/format
             Bitmap temp = Bitmap.createBitmap(width, height, Config.ARGB_4444);
             Canvas g = new Canvas(temp);
-            g.drawBitmap(image, 0, 0, paint);
-            if (!image.isRecycled()) {
-                image.recycle();
-            }
+            g.drawBitmap(image, 0, 0, new Paint());
             image = temp;
         }
         int[] data = getImageData(image);
@@ -343,18 +461,19 @@ public class SimpleAnimatedGifEncoder {
 
         for (int i = 0; i < data.length; i++) {
             int td = data[i];
-            if (td >> 24 != 0) {//去掉透明像素,这里实际上透明像素被赋值为0了
+            if(td >> 24 != 0) {//去掉透明像素,这里实际上透明像素被赋值为0了
                 float r = ((td >> 16) & 0xff);
                 float g = ((td >> 8) & 0xff);
                 float b = ((td) & 0xff);
 
                 //由于设置了黑色为透明，所以图片里面原本的黑色都需要改为其他颜色
-                int tind = i * 3;
                 if (r == 0 && g == 0 && b == 0) {
+                    int tind = i * 3;
                     pixels[tind++] = (byte) (1);
                     pixels[tind++] = (byte) (1);
                     pixels[tind] = (byte) (1);
                 } else {
+                    int tind = i * 3;
                     pixels[tind++] = (byte) (b);
                     pixels[tind++] = (byte) (g);
                     pixels[tind] = (byte) (r);
@@ -364,7 +483,7 @@ public class SimpleAnimatedGifEncoder {
     }
 
 
-    private int[] getImageData(Bitmap img) {
+    protected int[] getImageData(Bitmap img) {
         int w = img.getWidth();
         int h = img.getHeight();
 
@@ -376,7 +495,7 @@ public class SimpleAnimatedGifEncoder {
     /**
      * Writes Graphic Control Extension
      */
-    private void writeGraphicCtrlExt() throws IOException {
+    protected void writeGraphicCtrlExt() throws IOException {
         out.write(0x21); // extension introducer
         out.write(0xf9); // GCE label
         out.write(4); // data block size
@@ -407,7 +526,7 @@ public class SimpleAnimatedGifEncoder {
     /**
      * Writes Image Descriptor
      */
-    private void writeImageDesc() throws IOException {
+    protected void writeImageDesc() throws IOException {
         out.write(0x2c); // image separator
         writeShort(x); // image position x,y = 0,0
         writeShort(y);
@@ -430,7 +549,7 @@ public class SimpleAnimatedGifEncoder {
     /**
      * Writes Logical Screen Descriptor
      */
-    private void writeLSD() throws IOException {
+    protected void writeLSD() throws IOException {
         // logical screen size
         writeShort(width);
         writeShort(height);
@@ -447,7 +566,7 @@ public class SimpleAnimatedGifEncoder {
     /**
      * Writes Netscape application extension to define repeat count.
      */
-    private void writeNetscapeExt() throws IOException {
+    protected void writeNetscapeExt() throws IOException {
         out.write(0x21); // extension introducer
         out.write(0xff); // app extension label
         out.write(11); // block size
@@ -461,7 +580,7 @@ public class SimpleAnimatedGifEncoder {
     /**
      * Writes color table
      */
-    private void writePalette() throws IOException {
+    protected void writePalette() throws IOException {
         out.write(colorTab, 0, colorTab.length);
         int n = (3 * 256) - colorTab.length;
         for (int i = 0; i < n; i++) {
@@ -472,7 +591,7 @@ public class SimpleAnimatedGifEncoder {
     /**
      * Encodes and writes pixel data
      */
-    private void writePixels() throws IOException {
+    protected void writePixels() throws IOException {
         LZWEncoder encoder = new LZWEncoder(width, height, indexedPixels, colorDepth);
         encoder.encode(out);
     }
@@ -480,7 +599,7 @@ public class SimpleAnimatedGifEncoder {
     /**
      * Write 16-bit value to output stream, LSB first
      */
-    private void writeShort(int value) throws IOException {
+    protected void writeShort(int value) throws IOException {
         out.write(value & 0xff);
         out.write((value >> 8) & 0xff);
     }
@@ -488,7 +607,7 @@ public class SimpleAnimatedGifEncoder {
     /**
      * Writes string to output stream
      */
-    private void writeString(String s) throws IOException {
+    protected void writeString(String s) throws IOException {
         for (int i = 0; i < s.length(); i++) {
             out.write((byte) s.charAt(i));
         }

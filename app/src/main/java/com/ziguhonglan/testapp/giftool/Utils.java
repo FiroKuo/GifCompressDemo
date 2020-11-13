@@ -1,4 +1,4 @@
-package com.ziguhonglan.testapp.ui.giftool;
+package com.ziguhonglan.testapp.giftool;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;

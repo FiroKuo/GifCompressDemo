@@ -11,8 +11,8 @@ import androidx.annotation.Nullable;
 
 import com.bumptech.glide.Glide;
 import com.ziguhonglan.testapp.R;
-import com.ziguhonglan.testapp.ui.giftool.GifUtil;
-import com.ziguhonglan.testapp.ui.giftool.IResizeGifCallback;
+import com.ziguhonglan.testapp.giftool.GifUtil;
+import com.ziguhonglan.testapp.giftool.IResizeGifCallback;
 
 import java.io.File;
 import java.io.FileOutputStream;
